@@ -20,7 +20,7 @@ def ref(matrix):
                     return mat
         # Меняем строки местами, если нужно
         mat[[i, r]] = mat[[r, i]]
-
+        
         # Обрабатываем все строки ниже текущей
         for i in range(r + 1, n_rows):
             if mat[i, lead] != 0:
