@@ -1,238 +1,129 @@
+import methods
 import numpy as np
 
-from itertools import combinations
-# задание 1.1
-def ref(matrix):
-    # Преобразуем матрицу в формат numpy для удобной работы
-    mat = np.array(matrix)
-    n_rows, n_cols = mat.shape
-    lead = 0
-    for r in range(n_rows):
-        if lead >= n_cols:
-            return mat
-        i = r
-        while mat[i, lead] == 0:
-            i += 1
-            if i == n_rows:
-                i = r
-                lead += 1
-                if lead == n_cols:
-                    return mat
-        # Меняем строки местами, если нужно
-        mat[[i, r]] = mat[[r, i]]
-        
-        # Обрабатываем все строки ниже текущей
-        for i in range(r + 1, n_rows):
-            if mat[i, lead] != 0:
-                mat[i] = (mat[i] + mat[r]) % 2
-        lead += 1
-    return mat
+if __name__ == '__main__':
 
+    print("3.1\n")
 
-# задание 1.2
-def rref(mat):
-    mat = ref(mat)
-    n_rows, n_cols = mat.shape
-
-    # Пройдёмся по строкам сверху вниз
-    for r in range(n_rows - 1, -1, -1):
-        # Находим ведущий элемент в строке
-        lead = np.argmax(mat[r] != 0)
-        if mat[r, lead] != 0:
-            # Обнуляем все элементы выше ведущего
-            for i in range(r - 1, -1, -1):
-                if mat[i, lead] != 0:
-                    mat[i] = (mat[i] + mat[r]) % 2
-    while not any(mat[n_rows - 1]):
-        mat = mat[:-1, :]
-        n_rows -= 1
-    return mat
-
-
-# Задание 1.3: Ведущие столбцы и удаление их для создания сокращённой матрицы
-def find_lead_columns(matrix):
-    lead_columns = []
-    for r in range(len(matrix)):
-        row = matrix[r]
-        for i, val in enumerate(row):
-            if val == 1:  # Первый элемент 1 в строке - ведущий элемент
-                lead_columns.append(i)
-                break
-    return lead_columns
-
-
-# Удаление ведущих столбцов
-def remove_lead_columns(matrix, lead_columns):
-    mat = np.array(matrix)
-    reduced_matrix = np.delete(mat, lead_columns, axis=1)
-    return reduced_matrix
-
-
-# Шаг 4: Формирование матрицы H
-def form_H_matrix(X, lead_columns, n_cols):
-    # Инициализация единичной матрицы размером (n - k) на n
-    n_rows = np.shape(X)[1]
-
-    H = np.zeros((n_cols, n_rows), dtype=int)
-    I = np.eye(6, dtype=int)
-
-    H[lead_columns, :] = X
-    not_lead = [i for i in range(n_cols) if i not in lead_columns]
-    H[not_lead, :] = I
-
-    return H
-
-
-# Основная функция для выполнения всех шагов
-def LinearCode(mat):
-    # Задание 1.3.1: Преобразуем матрицу в ступенчатый вид
-    G_star = rref(mat)
-
-    print("G* (RREF матрица) =")
-    print(G_star)
-
-    # Задание 1.3.2: Найти ведущие столбцы
-    lead_columns = find_lead_columns(G_star)
-    print(f"lead = {lead_columns}")
-
-    # Задание 1.3.3: Удалить ведущие столбцы и получить сокращённую матрицу
-    X = remove_lead_columns(G_star, lead_columns)
-    print("Сокращённая матрица X =")
-    print(X)
-
-    # Задание 1.3.4: Сформировать проверочную матрицу H
-    n_cols = np.shape(mat)[1]
-    H = form_H_matrix(X, lead_columns, n_cols)
-    print("Проверочная матрица H =")
+    r = 2
+    H = methods.generate_hamming_h_matrix(r)
+    print("Возьмем r = 2, получим проверочную матрицу следующего вида")
     print(H)
+    print("\nПроверим функцию и построим порождающую матрицу")
+    G = methods.H_to_G(H, r)
+    print(G)
 
-    return H
+    print("\n3.2\n")
 
-
-# задание 1.3
-
-# Функция для нахождения всех кодовых слов из порождающей матрицы
-def generate_codewords_from_combinations(G):
-    rows = G.shape[0]
-    codewords = set()
-
-    # Перебираем все возможные комбинации строк матрицы G
-    for r in range(1, rows + 1):
-        for comb in combinations(range(rows), r):
-            # Суммируем строки и добавляем результат в множество
-            codeword = np.bitwise_xor.reduce(G[list(comb)], axis=0)
-            codewords.add(tuple(codeword))
-
-    # Добавляем в множество нулевой вектор
-    codewords.add(tuple(np.zeros(G.shape[1], dtype=int)))
-
-    return np.array(list(codewords))
-
-# Функция для умножения всех двоичных слов длины k на G
-def generate_codewords_binary_multiplication(G):
-    k = G.shape[0]
-    n = G.shape[1]
-    codewords = []
-
-    # Генерируем все двоичные слова длины k
-    for i in range(2**k):
-        binary_word = np.array(list(np.binary_repr(i, k)), dtype=int)
-        codeword = np.dot(binary_word, G) % 2
-        codewords.append(codeword)
-
-    return np.array(codewords)
-
-# Проверка кодового слова с помощью проверочной матрицы H
-def check_codeword(codeword, H):
-    return np.dot(codeword, H) % 2
-
-# Вычисление кодового расстояния
-def calculate_code_distance(codewords):
-    min_distance = float('inf')
-
-    # Считаем количество ненулевых элементов для всех попарных разностей кодовых слов
-    for i in range(len(codewords)):
-        for j in range(i + 1, len(codewords)):
-            distance = np.sum(np.bitwise_xor(codewords[i], codewords[j]))
-            if distance > 0:
-                min_distance = min(min_distance, distance)
-
-    return min_distance
-
-# Основная функция для выполнения всех шагов
-def LinearCodeWithErrors(mat):
-    # Выполнение шагов, как и ранее
-    G_star = rref(mat)
-    lead_columns = find_lead_columns(G_star)
-    X = remove_lead_columns(G_star, lead_columns)
-    n_cols = np.shape(mat)[1]
-    H = form_H_matrix(X, lead_columns, n_cols)
-
-    print("G* (RREF матрица) =")
-    print(G_star)
-    print(f"lead = {lead_columns}")
-    print("Сокращённая матрица X =")
-    print(X)
-    print("Проверочная матрица H =")
+    print("Сформируем таблицу синдромов для всех единичных ошибок")
+    syndrome_table = methods.generate_syndrome_table(H, 1)
+    print(syndrome_table)
+    print("\nПроведем исследование кода Хэмминга для ошибки кратности 1. Передаем сообщение длины 2^r - r - 1 = 2^2 - 2 - 1 = 1: 1 0 0 1")
+    methods.hamming_correction_test(G, H, syndrome_table, 1, np.array([1]))
+    print("\nКод успешно отловил ошибку и исправил ее. Теперь попробуем допустить двухкратную ошибку")
+    methods.hamming_correction_test(G, H, syndrome_table, 2, np.array([1]))
+    print("\nТак как код Хэмминга предназначен либо для исправления однократных ошибок, либо для обнаружения двухкратных, мы смогли обнаружить ошибку, но не смогли ее исправить. Попробуем теперь трехкратную ошибку")
+    methods.hamming_correction_test(G, H, syndrome_table, 3, np.array([1]))
+    print("\nЗдесь возможно два варианта:")
+    print("1. Синдрома в таблице синдромов для конкретной трехкратной ошибки нет. Ошибку в данном случае исправить не получится")
+    print("2. Синдром в таблице имеется, программа попытается исправить ошибку, но, конечно, результат будет неверным")
+    print("\nАналогично, проведем исследование для r = 3. Пересчитаем проверочную матрицу")
+    r = 3
+    H = methods.generate_hamming_h_matrix(r)
     print(H)
+    print("\nПересчитаем G")
+    G = methods.H_to_G(H, r)
+    print(G)
+    print("\nИ составим заново таблицу синдромов")
+    syndrome_table = methods.generate_syndrome_table(H, 1)
+    print(syndrome_table)
+    print("\nПередаем слово длины 4: 1 0 0 1. Сначала допустим однократную ошибку")
+    methods.hamming_correction_test(G, H, syndrome_table, 1, np.array([1, 0, 0, 1]))
+    print("\nТеперь для двухкратной ошибки")
+    methods.hamming_correction_test(G, H, syndrome_table, 2, np.array([1, 0, 0, 1]))
+    print("\nИ для трехкратной ошибки")
+    methods.hamming_correction_test(G, H, syndrome_table, 3, np.array([1, 0, 0, 1]))
+    print("\nРезультаты аналогичны r = 2. Теперь проведем исследование для r = 4")
+    print("\nПересчитаем H")
+    r = 4
+    H = methods.generate_hamming_h_matrix(r)
+    print(H)
+    print("\nПересчитаем G")
+    G = methods.H_to_G(H, r)
+    print(G)
+    print("\nЗаново составим таблицу синдромов")
+    syndrome_table = methods.generate_syndrome_table(H, 1)
+    print(syndrome_table)
+    print("\nПередаем сообщение длины 11: 0 0 1 0 1 1 0 0 1 1 1. Допустим однократную ошибку")
+    methods.hamming_correction_test(G, H, syndrome_table, 1, np.array([0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1]))
+    print("\nТеперь допустим двухкратную ошибку")
+    methods.hamming_correction_test(G, H, syndrome_table, 2, np.array([0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1]))
+    print("\nИ, наконец, трехкратную ошибку")
+    methods.hamming_correction_test(G, H, syndrome_table, 3, np.array([0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1]))
+    print("\nРезультаты аналогичны r = 2, r = 3. Код Хэмминга позволяет либо исправлять однократную ошибку, либо обнаруживать двухкратную\n")
 
-    # 1.4.1 Генерация всех кодовых слов через сложение строк
-    codewords_1 = generate_codewords_from_combinations(G_star)
-    print("Все кодовые слова (способ 1):")
-    print(codewords_1)
+    print("3.3\n")
 
-    # 1.4.2 Генерация кодовых слов умножением двоичных слов на G
-    codewords_2 = generate_codewords_binary_multiplication(G_star)
-    print("Все кодовые слова (способ 2):")
-    print(codewords_2)
+    print("Возьмем r = 2. Проверочную матрицу H* расширенного кода Хэмминга можно построить на основе проверочной матрицы обычного кода Хэмминга")
+    r = 2
+    H = methods.generate_hamming_h_matrix(r)
+    H_exp = np.vstack((H, np.array([0] * H.shape[1])))
+    H_exp = np.hstack((H_exp, np.array([[1] * H_exp.shape[0]]).T))
+    print(H_exp)
+    print("\nПорождающую матрицу G* расширенного кода Хэмминга можно построить на основе порождающей матрицы обычного кода Хэмминга")
+    G = methods.H_to_G(H, r)
+    G_exp = methods.expand_G_matrix(G)
+    print(G_exp)
+    print("\nПостроим таблицу синдромов")
+    syndrome_table = methods.generate_syndrome_table(H_exp, 1)
+    print(syndrome_table)
 
-    # Проверка, что множества кодовых слов совпадают
-    assert set(map(tuple, codewords_1)) == set(map(tuple, codewords_2)), "Наборы кодовых слов не совпадают!"
+    print("\n3.4\n")
 
-    # Проверка кодовых слов с помощью матрицы H
-    for codeword in codewords_1:
-        result = check_codeword(codeword, H)
-        assert np.all(result == 0), f"Ошибка: кодовое слово {codeword} не прошло проверку матрицей H"
-
-    print("Все кодовые слова прошли проверку матрицей H.")
-
-    # 1.4 Вычисление кодового расстояния
-    d = calculate_code_distance(codewords_1)
-    t = 0
-    if t == 0:
-        t = 1
-    else:
-        t = (d - 1) // 2
-    print(f"Кодовое расстояние d = {d}")
-    print(f"Кратность обнаруживаемой ошибки t = {t}")
-
-    # Проверка ошибки кратности t
-    e1 = np.zeros(n_cols, dtype=int)
-    e1[2] = 1  # Внесение ошибки в один бит
-    v = codewords_1[4]
-    print(f"e1 = {e1}")
-    print(f"v = {v}")
-    v_e1 = (v + e1) % 2
-    print(f"v + e1 = {v_e1}")
-    print(f"(v + e1)@H = {check_codeword(v_e1, H)} - error")
-
-    # Проверка ошибки кратности t+1
-    e2 = np.zeros(n_cols, dtype=int)
-    e2[6] = 1
-    e2[9] = 1  # Внесение ошибки в два бита
-    print(f"e2 = {e2}")
-    v_e2 = (v + e2) % 2
-    print(f"v + e2 = {v_e2}")
-    print(f"(v + e2)@H = {check_codeword(v_e2, H)} - no error")
-
-    return H
-
-# Пример использования
-matrix = ([[1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1],
-           [0, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0],
-           [0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1],
-           [1, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1],
-           [0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 0],
-           [1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0]]
-)
-result = LinearCodeWithErrors(matrix)
+    print("Проведем исследование для r = 2. Передаем сообщение длины 1: 1. Допускаем однократную ошибку")
+    methods.hamming_correction_test(G_exp, H_exp, syndrome_table, 1, np.array([1]))
+    print("\nДопускаем двухкратную ошибку")
+    methods.hamming_correction_test(G_exp, H_exp, syndrome_table, 2, np.array([1]))
+    print("\nДвухкратную ошибку исправить не удалось, но она была обнаружена")
+    print("\nДопускаем трехкратную ошибку")
+    methods.hamming_correction_test(G_exp, H_exp, syndrome_table, 3, np.array([1]))
+    print("\nТрехкратную ошибку также удалось обнаружить, но не исправить")
+    print("\nПроведем исследование для r = 3. Перепишем H")
+    r = 3
+    H = methods.generate_hamming_h_matrix(r)
+    H_exp = np.vstack((H, np.array([0] * H.shape[1])))
+    H_exp = np.hstack((H_exp, np.array([[1] * H_exp.shape[0]]).T))
+    print(H_exp)
+    print("\nЗаново составим G")
+    G = methods.H_to_G(H, r)
+    G_exp = methods.expand_G_matrix(G)
+    print(G_exp)
+    print("\nЗаново заполним таблицу синдромов")
+    syndrome_table = methods.generate_syndrome_table(H_exp, 1)
+    print(syndrome_table)
+    print("\nОтсылаем сообщение длины 4: 1 0 1 0. Допустим однократную ошибку")
+    methods.hamming_correction_test(G_exp, H_exp, syndrome_table, 1, np.array([1, 0, 1, 0]))
+    print("\nДопустим двухкратную ошибку")
+    methods.hamming_correction_test(G_exp, H_exp, syndrome_table, 2, np.array([1, 0, 1, 0]))
+    print("\nДопустим трехкратную ошибку")
+    methods.hamming_correction_test(G_exp, H_exp, syndrome_table, 3, np.array([1, 0, 1, 0]))
+    print("\nРезультаты аналогичны r = 2. Аналогичное исследование проведем для r = 4. Перепишем H")
+    r = 4
+    H = methods.generate_hamming_h_matrix(r)
+    H_exp = np.vstack((H, np.array([0] * H.shape[1])))
+    H_exp = np.hstack((H_exp, np.array([[1] * H_exp.shape[0]]).T))
+    print(H_exp)
+    print("\nЗаново составим G")
+    G = methods.H_to_G(H, r)
+    G_exp = methods.expand_G_matrix(G)
+    print(G_exp)
+    print("\nЗаново составим таблицу синдромов")
+    syndrome_table = methods.generate_syndrome_table(H_exp, 1)
+    print(syndrome_table)
+    print("\nОтсылаем сообщение длины 11: 1 0 0 1 1 1 1 0 1 1 0. Допустим однократную ошибку")
+    methods.hamming_correction_test(G_exp, H_exp, syndrome_table, 1, np.array([1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 0]))
+    print("\nДопустим двухкратную ошибку")
+    methods.hamming_correction_test(G_exp, H_exp, syndrome_table, 2, np.array([1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 0]))
+    print("\nДопустим трехкратную ошибку")
+    methods.hamming_correction_test(G_exp, H_exp, syndrome_table, 3, np.array([1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 0]))
+    print("\nПолучили результаты аналогичные r = 2 и r = 3. Расширенный код Хэмминга позволяет исправлять однократные ошибки и обнаруживать двухкратные одновременно")
